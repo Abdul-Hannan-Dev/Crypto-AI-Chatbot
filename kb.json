@@ -854,6 +854,156 @@
       "date": "2026-01-13 15:37:48",
       "daily_change_percentage": "2.1204728842184",
       "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "96643",
+      "last_btc": "1",
+      "lowest": "95808.79",
+      "highest": "97679.6",
+      "date": "2026-01-15 15:26:40",
+      "daily_change_percentage": "-1.0255783177369",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "ICP",
+      "last": "4.292",
+      "last_btc": "0.000044411447433433",
+      "lowest": "4.18",
+      "highest": "4.802",
+      "date": "2026-01-15 15:26:58",
+      "daily_change_percentage": "-4.2605398170868",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "UNI",
+      "last": "5.491",
+      "last_btc": "0.000056818099508556",
+      "lowest": "5.458",
+      "highest": "5.769",
+      "date": "2026-01-15 15:27:02",
+      "daily_change_percentage": "-4.6535856919604",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "96658.29",
+      "last_btc": "1",
+      "lowest": "95808.79",
+      "highest": "97679.6",
+      "date": "2026-01-15 15:39:20",
+      "daily_change_percentage": "-1.0099194608356",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "DOGE",
+      "last": "0.14388",
+      "last_btc": "0.000001488691870478",
+      "lowest": "0.14261",
+      "highest": "0.14784",
+      "date": "2026-01-15 15:39:34",
+      "daily_change_percentage": "-2.2687134900149",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "ICP",
+      "last": "4.285",
+      "last_btc": "0.000044335872428571",
+      "lowest": "4.18",
+      "highest": "4.802",
+      "date": "2026-01-15 15:39:58",
+      "daily_change_percentage": "-4.4166852554093",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "UNI",
+      "last": "5.489",
+      "last_btc": "0.000056794442608435",
+      "lowest": "5.458",
+      "highest": "5.769",
+      "date": "2026-01-15 15:40:00",
+      "daily_change_percentage": "-4.688313943393",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "96646.79",
+      "last_btc": "1",
+      "lowest": "95808.79",
+      "highest": "97679.6",
+      "date": "2026-01-15 15:40:02",
+      "daily_change_percentage": "-1.0216968875436",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "96847.25",
+      "last_btc": "1",
+      "lowest": "95808.79",
+      "highest": "97679.6",
+      "date": "2026-01-15 15:52:26",
+      "daily_change_percentage": "-0.81640097816137",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "DOGE",
+      "last": "0.14426",
+      "last_btc": "0.0000014884488384146",
+      "lowest": "0.14261",
+      "highest": "0.14784",
+      "date": "2026-01-15 15:54:47",
+      "daily_change_percentage": "-2.0105963863605",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "96937.62",
+      "last_btc": "1",
+      "lowest": "95808.79",
+      "highest": "97679.6",
+      "date": "2026-01-15 17:03:10",
+      "daily_change_percentage": "-0.72385088671734",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "96937.62",
+      "last_btc": "1",
+      "lowest": "95808.79",
+      "highest": "97679.6",
+      "date": "2026-01-15 17:03:20",
+      "daily_change_percentage": "-0.72385088671734",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "ICT",
+      "last": "0.04954",
+      "last_btc": "0.00000051",
+      "lowest": "0.04569",
+      "highest": "0.11192",
+      "date": "2026-01-15 17:05:36",
+      "daily_change_percentage": "0.62969733902092",
+      "source_exchange": "mexc"
+    },
+    {
+      "symbol": "ETH",
+      "last": "3372.16",
+      "last_btc": "0.034782465188241",
+      "lowest": "3279.86",
+      "highest": "3382.67",
+      "date": "2026-01-15 17:07:10",
+      "daily_change_percentage": "-0.30068030026639",
+      "source_exchange": "binance"
+    },
+    {
+      "symbol": "BTC",
+      "last": "94476.98",
+      "last_btc": "1",
+      "lowest": "94434.85",
+      "highest": "95845.4",
+      "date": "2026-01-16 18:43:14",
+      "daily_change_percentage": "-0.79381138566011",
+      "source_exchange": "binance"
     }
   ]
 }

@@ -4,6 +4,7 @@ from langchain_groq import ChatGroq
 from langchain_core.prompts  import ChatPromptTemplate
 from langchain_core.output_parsers import PydanticOutputParser
 from langchain_classic.agents import AgentExecutor
+from langchain_core.messages import HumanMessage, AIMessage
 from langchain_classic.agents import create_tool_calling_agent
 from tools import kb, get_crypto_price
 import  os, time, json
@@ -55,6 +56,18 @@ DECISION RULES
 6. Must NOT answer directly from the LLM/on your own.
 
 Skipping steps is forbidden.
+
+──────────────
+CHAIN OF THOUGHTS
+──────────────
+
+You must internally reason step-by-step to decide:
+- whether KB has data
+- whether API is needed
+- whether rejection is required
+
+DO NOT reveal your reasoning.
+Only output the final JSON.
 
 ──────────────
 CONTEXT HANDLING
@@ -114,8 +127,10 @@ The source and confidence values are arbitrary for explanation purpose only, you
 {format_instructions}
 """
     ),
+    ("system", "..."),
+    ("placeholder", "{chat_history}"),
     ("human", "{query}"),
-    ("placeholder", "{agent_scratchpad}"),
+    ("placeholder", "{agent_scratchpad}")
 
 ]).partial(format_instructions=parser.get_format_instructions())
 
@@ -125,16 +140,22 @@ agent=create_tool_calling_agent(
     tools=tools,
     prompt=prompt)
 
-def agent_executor(query: str):
+def agent_executor(query: str, chat_history: list):
     
     try:
+        formatted_history = []
+        for msg in chat_history:
+            if msg["role"] == "user":
+                formatted_history.append(HumanMessage(content=msg["content"]))
+            elif msg["role"] == "assistant":
+                formatted_history.append(AIMessage(content=json.dumps(msg["content"])))
         agent_executor=AgentExecutor(
             agent=agent,
             tools=tools,
             verbose=True)
 
         response=agent_executor.invoke(
-            {"query":query}
+            {"query":query,"chat_history": formatted_history}
             )
         data=json.loads(response['output'])
         memory='memory.json'

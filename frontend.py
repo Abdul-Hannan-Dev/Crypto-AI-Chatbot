@@ -1,6 +1,5 @@
 import streamlit as st
 from main import agent_executor
-import time
 
 st.title("Cryptocurrency Info Agent")
 
@@ -24,7 +23,7 @@ try:
                 st.markdown(prompt)
             with st.chat_message("assistant"):
                     with st.spinner("Thinking..."):
-                        response = agent_executor(prompt)
+                        response = agent_executor(prompt, st.session_state.messages)
 
                         for i in response:
                             st.markdown(i.upper())
