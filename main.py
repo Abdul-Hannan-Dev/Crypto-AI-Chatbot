@@ -7,7 +7,7 @@ from langchain_classic.agents import AgentExecutor
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain_classic.agents import create_tool_calling_agent
 from tools import kb, get_crypto_price
-import  os, time, json
+import  os, time, json,sqlite3
 
 load_dotenv()
 
@@ -158,17 +158,23 @@ def agent_executor(query: str, chat_history: list):
             {"query":query,"chat_history": formatted_history}
             )
         data=json.loads(response['output'])
-        memory='memory.json'
-        data_for_memory={'query':query,'response':data}
-        if not os.path.exists(memory):
-            with open(memory, "w") as f:
-                json.dump([], f)
-        with open(memory,'r') as f:
-            mem_data=json.load(f)
-            mem_data.append(data_for_memory)
-        with open(memory,'w') as f:
-            json.dump(mem_data,f,indent=4)
-        return data
+        conn = sqlite3.connect("memory.db", check_same_thread=False)
+        cursor = conn.cursor()
+
+        cursor.execute("""
+        CREATE TABLE IF NOT EXISTS chat_memory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            query TEXT,
+            response TEXT
+        )
+        """)
+        conn.commit()
+
+        cursor.execute(
+            "INSERT INTO chat_memory (query, response) VALUES (?, ?)",
+            (query, json.dumps(data))
+        )
+        conn.commit()
     except Exception as e:
         return f"Error during agent execution: {str(e)}"
     
