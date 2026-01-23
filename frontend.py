@@ -32,5 +32,5 @@ try:
                     "role": "user","content": prompt}
                 )
             st.session_state.messages.append({'role': "assistant","content": response})
-except:
-    st.error("An error occurred while processing your request. Please try again.")
+except Exception as e:
+    st.error(f"An error occurred while processing your request. Please try again: {str(e)}")
