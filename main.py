@@ -1,179 +1,238 @@
+
+import os
+import json
+import sqlite3
+import logging
+
+from pathlib import Path
+
 from dotenv import load_dotenv
-from pydantic import BaseModel
 from langchain_groq import ChatGroq
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import PydanticOutputParser
-from langchain_core.messages import HumanMessage, AIMessage, ToolMessage
+from langchain_core.messages import (
+    SystemMessage,
+    HumanMessage,
+    AIMessage,
+    ToolMessage
+)
+
 from tools import kb, get_crypto_price
-import os, time, json, sqlite3
 
 load_dotenv()
-time.sleep(1)
 
-class ResearchResponse(BaseModel):
-    topic:str
-    summary:str
-    source:str
-    confidence:float
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 
-llm=ChatGroq(model="llama-3.1-8b-instant", api_key=os.getenv("GROQ_API_KEY"))
-parser=PydanticOutputParser(pydantic_object=ResearchResponse)
+BASE_DIR = Path(__file__).parent
+DB_PATH = BASE_DIR / "memory.db"
 
-prompt = ChatPromptTemplate.from_messages(
-    [
-        (
-            "system",
-            """
-You are a crypto facts agent. You are NOT allowed to answer from general language model knowledge. You can make sentences in your own words but data must be from KB or API.
+llm = ChatGroq(
+    model="openai/gpt-oss-20b",
+    api_key=os.getenv("GROQ_API_KEY"),
+    temperature=0
+)
 
-Do process the question of the user about what is he demanding, you're independent in your thought process but the data must strictly be from the knowledge base or the API in the tools.
+TOOLS = {
+    "kb": kb,
+    "get_crypto_price": get_crypto_price
+}
 
-If the query has typographical errors, you must correct them before processing.
+llm_with_tools = llm.bind_tools(list(TOOLS.values()))
 
-Remember that "kb" tool is your PRIMARY source of information. Alsways looks for answers there first. And if you find the answer in it, type "Knowledge Base" as the source in your final answer.
+SYSTEM_PROMPT = """
+You are a conversational cryptocurrency information agent.
 
-If the "kb" tool does not have the required data, you MUST use the "get_crypto_price" tool to fetch real-time data from the external crypto data API. And register "External Tool" as the source in your final answer.
+Your purpose is to answer cryptocurrency questions accurately,
+naturally, and concisely using verified information.
 
-AGAIN: DO NOT answer from your own knowledge or make up any data. You MUST use the tools provided to you to get the data.
+You must never invent cryptocurrency facts or market data.
 
-You may produce an answer ONLY if it is:
-1) Present in the Knowledge Base, or
-2) Retrieved by an external crypto data tool, or
-3) Derived strictly from Knowledge Base data combined with tool results
+UNDERSTANDING USER INTENT
 
-If none of these conditions are met, you MUST reject the query.
+Understand the user's actual request, not merely the presence
+of cryptocurrency names in their message.
 
-──────────────
-DECISION RULES
-──────────────
-1. Identify the crypto entity and user intent
-2. Query the Knowledge Base first
-3. If required data is missing or stale, use the external tool
-4. Persist any newly retrieved data back to the Knowledge Base
-5. Respond only after verifiable data is obtained
-6. Must NOT answer directly from the LLM/on your own.
+Users may write long, informal, grammatically incorrect,
+or conversational messages.
 
-Skipping steps is forbidden.
+They may mention several cryptocurrencies while asking
+about only one.
 
-──────────────
-CHAIN OF THOUGHTS
-──────────────
-You must internally reason step-by-step to decide:
-- whether KB has data
-- whether API is needed
-- whether rejection is required
+Identify the actual requested entities and requested facts.
 
-DO NOT reveal your reasoning. Only output the final JSON.
+Examples:
 
-──────────────
-CONTEXT HANDLING
-──────────────
-- Maintain short-term context for follow-up questions
-- Resolve references using previously identified entities
+User:
+"I was thinking about buying BTC or DOGE, but what's
+the current price of bitcoin?"
 
-──────────────
-HALLUCINATION PREVENTION
-──────────────
-- Never guess, infer, or assume facts
-- Never answer hypotheticals or predictions
-- Reject any request not backed by the Knowledge Base or "get_crypto_price" tool
-- You MUST check both the Knowledge Base and the API for data before rejecting.
+Intent:
+Current price of Bitcoin only.
 
-Rejection message (exact text):
-{{"topic": "No Data", "summary": "INSUFFICIENT DATA – Not found in Knowledge Base or API", "source": "N/A", "confidence": 0.0}}
+User:
+"I know about bitcoin already, but what's the market
+price of ethereum?"
 
-──────────────
-RESPONSE REQUIREMENTS
-──────────────
-Every valid response MUST include:
-- The factual answer
-- Source label: Knowledge Base | External Tool
-- Confidence score between 0.0 and 1.0
-- The said key-value pairs must be in JSON format
+Intent:
+Current price of Ethereum only.
 
-──────────────
-STRICTLY DISALLOWED
-──────────────
-- Price predictions
-- Investment or trading advice
-- Future or hypothetical scenarios
-- Any unverifiable information
+User:
+"Can you compare btc and eth prices?"
 
-──────────────
-FINAL OUTPUT RULE (CRITICAL)
-──────────────
-- Your final answer MUST only include the JSON containing the required key: 'tools', 'summary', 'source', 'confidence'
+Intent:
+Current prices of Bitcoin and Ethereum.
 
-_____________
-EXAMPLES:
-_____________
+User:
+"What about its consensus mechanism?"
 
-User: "What is the last price of Bitcoin?"
-Agent: {{"topic": "Bitcoin", "summary": "The current price of Bitcoin is $43,210.55.", "source": "External Tool (as the case may be)", "confidence": 1.0}}
+Intent:
+Use conversation history to identify the previously
+discussed cryptocurrency.
 
-User: "What is the market cap of XRP?"
-Agent {{"topic": "XRP", "summary": "The market cap of XRP is $31 billion.", "source": "Knowledge Base", "confidence": 0.6}}
+User:
+"How much is bitcion trading for?"
 
-User: "Give me last prices,symbols and currencies of BTC,Ripple,Uniswap ??"
-Agent: {{"topic": "BTC, Ripple, Uniswap", "summary": "The last prices are: BTC - $43,210.55, Ripple - $0.85, Uniswap - $25.30.", "source": "Knowledge Base", "confidence": 0.8}}
+Intent:
+Current Bitcoin price. Correct the obvious typo.
 
-Even if the user asks for data of multiple coins, ensure the final answer is a single JSON object as specified.
+These examples are illustrative, not fixed rules.
 
-The answer must NOT contain any explanations or additional text outside the JSON.
+Understand symbols, cryptocurrency names, minor spelling
+mistakes, conversational references, and follow-up questions.
 
-The source and confidence values are arbitrary for explanation purpose only, you must not choose values for source depending whether you're getting it from KB or API, Confidence value should also depend upon your own confidence.
+Do not assume that every cryptocurrency mentioned is
+being requested.
 
-Return the final answer ONLY in this format:
-{format_instructions}
-            """
-        ),
-        ("placeholder", "{chat_history}"),
-        ("human", "{query}")
-    ]
-).partial(format_instructions=parser.get_format_instructions())
+If an entity is ambiguous, ask for clarification.
 
-tools=[kb,get_crypto_price]
-llm_with_tools = llm.bind_tools(tools)
+TOOL POLICY
 
-def agent_executor(query: str, chat_history: list):
-    try:
-        formatted_history = []
-        for msg in chat_history:
-            if msg["role"] == "user":
-                formatted_history.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "assistant":
-                formatted_history.append(AIMessage(content=json.dumps(msg["content"])))
-        
-        messages = prompt.invoke({"query": query, "chat_history": formatted_history})
-        
-        max_iterations = 10
-        for i in range(max_iterations):
-            response = llm_with_tools.invoke(messages.messages)
-            
-            if not response.tool_calls:
-                data = json.loads(response.content)
-                break
-            
-            messages.messages.append(response)
-            
-            for tool_call in response.tool_calls:
-                tool_name = tool_call["name"]
-                tool_args = tool_call["args"]
-                
-                if tool_name == "kb":
-                    result = kb.invoke(tool_args)
-                elif tool_name == "get_crypto_price":
-                    result = get_crypto_price.invoke(tool_args)
-                
-                messages.messages.append(
-                    ToolMessage(content=result, tool_call_id=tool_call["id"])
-                )
-        else:
-            return {"topic": "Error", "summary": "Max iterations reached", "source": "N/A", "confidence": 0.0}
-        
-        conn = sqlite3.connect("memory.db", check_same_thread=False)
-        cursor = conn.cursor()
-        cursor.execute("""
+You have two tools:
+
+kb:
+Searches the local knowledge base.
+
+get_crypto_price:
+Retrieves current market data from an external API.
+
+Always consult the knowledge base first when answering
+a cryptocurrency information question.
+
+Pass the cryptocurrency name or symbol to the tool,
+not the entire user message.
+
+For current market data, use get_crypto_price even if
+the knowledge base contains cached values.
+
+Never use historical cached prices as current prices.
+
+The knowledge base may contain:
+- Static cryptocurrency facts
+- Historical prices
+- Cached market capitalization
+- Historical API market snapshots
+
+Static facts may be answered from the KB.
+
+Current prices must be verified using the external API.
+
+For current market cap or other live metrics, only answer
+if the external tool actually returns the requested field.
+
+A live price does not prove a live market cap.
+
+If an API request fails, do not substitute cached data
+and describe it as current.
+
+If the user explicitly requests historical information,
+you may use timestamped cached data.
+
+Only retrieve data for cryptocurrencies relevant to
+the user's actual question.
+
+CONVERSATION HISTORY
+
+Use previous messages to understand follow-up questions.
+
+If the user previously asked about Bitcoin and now asks
+"What about its price?", understand that "its" refers
+to Bitcoin unless the conversation indicates otherwise.
+
+Do not blindly repeat previous answers.
+
+For current market questions, request fresh data.
+
+RESPONSE STYLE
+
+Respond like a normal, helpful chatbot.
+
+Do not return JSON.
+
+Do not use a rigid response template.
+
+Use a short natural paragraph, normally one to three
+sentences.
+
+Answer the user's actual question directly.
+
+Avoid lengthy introductions.
+
+Do not add unrelated cryptocurrency information.
+
+Use natural conversational wording where appropriate.
+
+Do not use emojis.
+
+Do not use em dashes.
+
+Do not use excessive formatting.
+
+Do not mention internal tool calls or reasoning.
+
+Do not invent missing values.
+
+For numeric data, use clear currency units.
+
+If the source contains a timestamp and it is useful,
+you may mention when the information was recorded.
+
+The application will append source and confidence
+information automatically.
+
+Do not include source or confidence labels yourself.
+
+RESTRICTIONS
+
+Do not provide investment recommendations, trading
+instructions, or unsupported price predictions.
+
+You may explain factual cryptocurrency information.
+
+If the user asks whether they should buy a cryptocurrency,
+explain that you can provide factual market information
+but cannot make the investment decision for them.
+
+If the question cannot be answered using verified data,
+clearly explain that the required information is unavailable.
+
+Do not fabricate an answer to appear helpful.
+
+FINAL RESPONSE
+
+Return only the natural-language answer.
+
+No JSON.
+
+No confidence labels.
+
+No source labels.
+
+No internal reasoning.
+"""
+
+
+def initialize_database():
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("""
             CREATE TABLE IF NOT EXISTS chat_memory (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 query TEXT,
@@ -181,15 +240,324 @@ def agent_executor(query: str, chat_history: list):
             )
         """)
         conn.commit()
-        
-        cursor.execute(
-            "INSERT INTO chat_memory (query, response) VALUES (?, ?)",
-            (query, json.dumps(data))
+
+
+def save_chat(query, response):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute(
+            """
+            INSERT INTO chat_memory (query, response)
+            VALUES (?, ?)
+            """,
+            (query, response)
         )
         conn.commit()
-        conn.close()
-        
-        return data
-        
+
+
+def format_history(chat_history):
+    history = []
+
+    # Keep recent context without unlimited token growth.
+    for message in chat_history[-12:]:
+        role = message.get("role")
+        content = message.get("content", "")
+
+        if not isinstance(content, str):
+            content = json.dumps(content)
+
+        if role == "user":
+            history.append(HumanMessage(content=content))
+
+        elif role == "assistant":
+            history.append(AIMessage(content=content))
+
+    return history
+
+
+def parse_tool_result(result):
+    if isinstance(result, dict):
+        return result
+
+    if isinstance(result, str):
+        try:
+            data = json.loads(result)
+
+            if isinstance(data, dict):
+                return data
+
+        except json.JSONDecodeError:
+            pass
+
+    return {
+        "status": "error",
+        "error": "Invalid tool result"
+    }
+
+
+def execute_tool(name, arguments):
+    if name not in TOOLS:
+        return {
+            "status": "error",
+            "error": f"Unknown tool: {name}"
+        }
+
+    if not isinstance(arguments, dict):
+        return {
+            "status": "error",
+            "error": "Invalid tool arguments"
+        }
+
+    query = str(arguments.get("query", "")).strip()
+
+    if not query:
+        return {
+            "status": "error",
+            "error": "Missing cryptocurrency name or symbol"
+        }
+
+    try:
+        result = TOOLS[name].invoke({
+            "query": query
+        })
+
+        return parse_tool_result(result)
+
     except Exception as e:
-        return f"Error during agent execution: {str(e)}"
+        logger.exception("Tool execution failed")
+
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+def get_source(successful_calls):
+    sources = {
+        call["source"]
+        for call in successful_calls
+    }
+
+    if not sources:
+        return "N/A"
+
+    if sources == {"Knowledge Base"}:
+        return "Knowledge Base"
+
+    if sources == {"External Tool"}:
+        return "External Tool"
+
+    return "Knowledge Base + External Tool"
+
+
+def get_confidence(successful_calls):
+    """
+    Evidence-quality indicator, not a calibrated
+    probability of correctness.
+    """
+    if not successful_calls:
+        return 0.0
+
+    sources = {
+        call["source"]
+        for call in successful_calls
+    }
+
+    if "External Tool" in sources:
+        return 1.0
+
+    return 0.9
+
+
+def add_metadata(answer, successful_calls):
+    source = get_source(successful_calls)
+    confidence = get_confidence(successful_calls)
+
+    return (
+        f"{answer.strip()}\n\n"
+        f"Confidence score: {confidence:.2f}  \n"
+        f"Source: {source}"
+    )
+
+
+def extract_answer(response):
+    content = response.content
+
+    if isinstance(content, str):
+        return content.strip()
+
+    if isinstance(content, list):
+        parts = []
+
+        for item in content:
+            if (
+                isinstance(item, dict)
+                and item.get("type") == "text"
+            ):
+                parts.append(item.get("text", ""))
+
+        return " ".join(parts).strip()
+
+    return ""
+
+
+def agent_executor(query: str, chat_history: list):
+    successful_calls = []
+    checked_kb = set()
+    live_attempted = False
+    live_succeeded = False
+
+    try:
+        messages = [
+            SystemMessage(content=SYSTEM_PROMPT)
+        ]
+
+        messages.extend(format_history(chat_history))
+        messages.append(HumanMessage(content=query))
+
+        max_iterations = 12
+
+        for _ in range(max_iterations):
+            response = llm_with_tools.invoke(messages)
+
+            messages.append(response)
+
+            if not response.tool_calls:
+                answer = extract_answer(response)
+
+                if not answer:
+                    answer = (
+                        "I couldn't generate a reliable answer "
+                        "to that question."
+                    )
+
+                # A failed live lookup must not be replaced
+                # with an old cached price.
+                if live_attempted and not live_succeeded:
+                    answer = (
+                        "I couldn't retrieve verified current "
+                        "market data for that request. "
+                        "Please try again later."
+                    )
+                    successful_calls = []
+
+                # Prevent unsupported factual answers when
+                # no tool supplied successful evidence.
+                elif not successful_calls and checked_kb:
+                    answer = (
+                        "I couldn't find verified information "
+                        "for that request in the available sources."
+                    )
+
+                final_answer = add_metadata(
+                    answer,
+                    successful_calls
+                )
+
+                save_chat(query, final_answer)
+                return final_answer
+
+            for tool_call in response.tool_calls:
+                tool_name = tool_call["name"]
+                tool_args = tool_call.get("args", {})
+
+                tool_query = str(
+                    tool_args.get("query", "")
+                ).strip()
+
+                normalized = tool_query.lower()
+
+                # Enforce KB-first execution.
+                # If the model requests the live API first,
+                # automatically search the KB before it.
+                if (
+                    tool_name == "get_crypto_price"
+                    and normalized not in checked_kb
+                    and tool_query
+                ):
+                    kb_result = execute_tool(
+                        "kb",
+                        {"query": tool_query}
+                    )
+
+                    checked_kb.add(normalized)
+
+                    if kb_result.get("status") == "success":
+                        successful_calls.append({
+                            "source": "Knowledge Base",
+                            "query": tool_query
+                        })
+
+                    # Give the model this KB evidence as
+                    # context in the next tool response.
+                    kb_context = kb_result
+                else:
+                    kb_context = None
+
+                result = execute_tool(
+                    tool_name,
+                    tool_args
+                )
+
+                if tool_name == "kb" and tool_query:
+                    checked_kb.add(normalized)
+
+                if tool_name == "get_crypto_price":
+                    live_attempted = True
+
+                    if result.get("status") == "success":
+                        live_succeeded = True
+
+                if result.get("status") == "success":
+                    source = (
+                        "Knowledge Base"
+                        if tool_name == "kb"
+                        else "External Tool"
+                    )
+
+                    successful_calls.append({
+                        "source": source,
+                        "query": tool_query
+                    })
+
+                tool_content = result
+
+                if kb_context is not None:
+                    tool_content = {
+                        "kb_lookup": kb_context,
+                        "requested_tool_result": result
+                    }
+
+                messages.append(
+                    ToolMessage(
+                        content=json.dumps(tool_content),
+                        tool_call_id=tool_call["id"]
+                    )
+                )
+
+        final_answer = add_metadata(
+            "I couldn't complete the information lookup. "
+            "Please try again.",
+            []
+        )
+
+        save_chat(query, final_answer)
+        return final_answer
+
+    except Exception:
+        logger.exception("Agent execution failed")
+
+        final_answer = add_metadata(
+            "Sorry, I encountered an error while processing "
+            "your request. Please try again.",
+            []
+        )
+
+        try:
+            save_chat(query, final_answer)
+        except Exception:
+            logger.exception("Chat logging failed")
+
+        return final_answer
+
+
+initialize_database()
