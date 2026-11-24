@@ -40,13 +40,9 @@ def parse_timestamp(value):
         timestamp = str(value).replace("Z", "+00:00")
         parsed = datetime.fromisoformat(timestamp)
 
-        # Assume UTC+3 for API timestamps without timezone
         if parsed.tzinfo is None:
-            parsed = parsed.replace(
-                tzinfo=timezone(timedelta(hours=3))
-            )
+            parsed = parsed.replace(tzinfo=timezone(timedelta(hours=3)))
 
-        # Convert to UTC
         return parsed.astimezone(timezone.utc)
 
     except (ValueError, TypeError):
@@ -186,6 +182,12 @@ def cached_coin_directory():
 
 
 def resolve_coin(query):
+    """
+    Resolve an exact name, symbol, or minor typo.
+
+    Returns a canonical coin name and symbol.
+    Ambiguous symbols are rejected.
+    """
     query = normalize(query)
 
     if not query:
@@ -389,8 +391,17 @@ def update_market_cache(symbol, market_data):
         save_kb(data)
 
 
-@tool
+@tool(description="Search the local cryptocurrency knowledge base using a cryptocurrency name or ticker symbol. Returns static facts and historical cached market data.")
 def kb(query: str) -> str:
+    """
+    Search the local cryptocurrency knowledge base.
+
+    Input must be a cryptocurrency name or ticker,
+    not the entire user message.
+
+    Returns static facts and historical cached data.
+    Cached market data must not be described as live.
+    """
     try:
         data = load_kb()
 
@@ -447,8 +458,17 @@ def kb(query: str) -> str:
         })
 
 
-@tool
+@tool(description="Retrieve current cryptocurrency market data from the external API using a cryptocurrency name or ticker symbol.")
 def get_crypto_price(query: str) -> str:
+    """
+    Fetch fresh cryptocurrency market data.
+
+    Input must be one cryptocurrency name or ticker.
+
+    Use for current prices and supported live market
+    statistics. Do not use cached data as a fallback
+    when the live API fails.
+    """
     try:
         if not API_KEY:
             return json.dumps({
@@ -534,6 +554,7 @@ def get_crypto_price(query: str) -> str:
         quote_age = (
             datetime.now(timezone.utc) - quote_time
         ).total_seconds()
+
         if (
             quote_age < -300
             or quote_age > MAX_QUOTE_AGE_SECONDS
