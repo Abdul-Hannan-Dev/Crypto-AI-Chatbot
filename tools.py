@@ -40,8 +40,11 @@ def parse_timestamp(value):
         timestamp = str(value).replace("Z", "+00:00")
         parsed = datetime.fromisoformat(timestamp)
 
+        # Assume UTC+3 for API timestamps without timezone
         if parsed.tzinfo is None:
-            parsed = parsed.replace(tzinfo=timezone(timedelta(hours=3)))
+            parsed = parsed.replace(
+                tzinfo=timezone(timedelta(hours=3))
+            )
 
         return parsed.astimezone(timezone.utc)
 
@@ -166,6 +169,7 @@ def get_coin_directory():
         COIN_LIST_URL,
         timeout=15
     )
+
     response.raise_for_status()
 
     data = response.json()
@@ -188,6 +192,7 @@ def resolve_coin(query):
     Returns a canonical coin name and symbol.
     Ambiguous symbols are rejected.
     """
+
     query = normalize(query)
 
     if not query:
@@ -296,6 +301,7 @@ def update_market_cache(symbol, market_data):
     Remove duplicate historical API-only records for
     the same symbol after successfully saving the quote.
     """
+
     with KB_LOCK:
         data = load_kb()
         symbol = symbol.upper()
@@ -391,10 +397,9 @@ def update_market_cache(symbol, market_data):
         save_kb(data)
 
 
-@tool(description="Search the local cryptocurrency knowledge base using a cryptocurrency name or ticker symbol. Returns static facts and historical cached market data.")
+@tool
 def kb(query: str) -> str:
-    """
-    Search the local cryptocurrency knowledge base.
+    """Search the local cryptocurrency knowledge base.
 
     Input must be a cryptocurrency name or ticker,
     not the entire user message.
@@ -402,6 +407,7 @@ def kb(query: str) -> str:
     Returns static facts and historical cached data.
     Cached market data must not be described as live.
     """
+
     try:
         data = load_kb()
 
@@ -458,10 +464,9 @@ def kb(query: str) -> str:
         })
 
 
-@tool(description="Retrieve current cryptocurrency market data from the external API using a cryptocurrency name or ticker symbol.")
+@tool
 def get_crypto_price(query: str) -> str:
-    """
-    Fetch fresh cryptocurrency market data.
+    """Fetch fresh cryptocurrency market data.
 
     Input must be one cryptocurrency name or ticker.
 
@@ -469,6 +474,7 @@ def get_crypto_price(query: str) -> str:
     statistics. Do not use cached data as a fallback
     when the live API fails.
     """
+
     try:
         if not API_KEY:
             return json.dumps({

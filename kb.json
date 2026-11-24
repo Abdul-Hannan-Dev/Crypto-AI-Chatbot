@@ -2,7 +2,7 @@
   "metadata": {
     "source": "Local Crypto Knowledge Base",
     "description": "Static crypto facts and cached market data for agent usage",
-    "last_updated": "2026-11-24T16:57:39.806594+00:00"
+    "last_updated": "2026-11-24T17:21:01.497950+00:00"
   },
   "coins": [
     {
@@ -12,13 +12,13 @@
       "consensus": "Proof of Work",
       "chain_type": "Layer 1",
       "cached_market_data": {
-        "last_price": 59517.95,
+        "last_price": 59763.09,
         "market_cap": 850000000000,
         "currency": "USD",
-        "price_timestamp": "2026-11-24 19:57:29",
-        "daily_change_percentage": "-2.7881107985843",
+        "price_timestamp": "2026-11-24 20:20:59",
+        "daily_change_percentage": "-2.3877186056604",
         "source_exchange": "binance",
-        "lowest": "59371",
+        "lowest": "59316.99",
         "highest": "61680",
         "last_btc": "1"
       }
